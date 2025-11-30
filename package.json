@@ -1,14 +1,29 @@
 {
-  "name": "telegram-bot",
-  "private": true,
+  "name": "ai-referat-bot",
+  "version": "2.0.0",
+  "description": "AI yordamida referat, mustaqil ish va slaydlar yaratuvchi Telegram bot",
+  "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node bot.js",
-    "dev": "node bot.js"
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node tests/test-bot.js"
   },
+  "keywords": [
+    "telegram",
+    "bot",
+    "ai",
+    "referat",
+    "education"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
   "dependencies": {
     "telegraf": "^4.15.0",
     "@supabase/supabase-js": "^2.39.0",
     "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

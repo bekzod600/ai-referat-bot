@@ -20,6 +20,11 @@ bot.use((ctx, next) => {
   return next();
 });
 
+// Markdown escape funksiyasi
+function escapeMarkdown(text) {
+  return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+}
+
 // /start komandasi
 bot.start(async (ctx) => {
   const { id, first_name, username, last_name } = ctx.from;
@@ -44,7 +49,7 @@ bot.start(async (ctx) => {
     await ctx.reply(
       `Salom ${first_name}! 👋\n\n` +
       `Siz AI yordamida referat, mustaqil ish va slaydlar yaratish botiga xush kelibsiz!\n\n` +
-      `💰 Balans: 200 coin (kanalga obunadan)\n\n` +
+      `💰 Balans: ${user.coin_balance} coin\n\n` +
       `👇 Quyidagi tugmalardan birini tanlang:`,
       Markup.keyboard([
         ['📝 Referat', '🎯 Mustaqil ish'],
@@ -80,8 +85,8 @@ bot.action('check_subscription', async (ctx) => {
 
       return ctx.reply(
         `✅ Xush kelibsiz!\n\n` +
-        `💰 Balans: 200 coin\n\n` +
-        `👥 Referral linkingiz:\nhttps://t.me/${botUsername}?start=ref${referralCode}\n\n` +
+        `💰 Balans: ${user.coin_balance} coin\n\n` +
+        `👥 Referral linkingiz:\n${`https://t.me/${botUsername}?start=ref${referralCode}`}\n\n` +
         `Do'stlaringizga yuboring, har biri uchun 50 coin olasiz!\n\n` +
         `Quyidagi tugmalardan birini tanlang:`,
         Markup.keyboard([
@@ -99,7 +104,7 @@ bot.action('check_subscription', async (ctx) => {
   }
 });
 
-// Referat
+// Referal
 bot.hears('👥 Referral', async (ctx) => {
   try {
     const user = await getUser(ctx.from.id);
@@ -110,11 +115,11 @@ bot.hears('👥 Referral', async (ctx) => {
     ctx.reply(
       `👥 Referral Tizimi\n\n` +
       `Har bir do'stingiz: 50 coin 🪙\n\n` +
-      `Sizning kod: \`${referralCode}\`\n\n` +
-      `Link: ${link}`,
-      { parse_mode: 'Markdown' }
+      `Sizning kodingiz: ${referralCode}\n\n` +
+      `Linkingiz:\n${link}`
     );
   } catch (error) {
+    console.error('Referral error:', error);
     ctx.reply('❌ Xato!');
   }
 });
@@ -125,6 +130,7 @@ bot.hears('📊 Balans', async (ctx) => {
     const user = await getUser(ctx.from.id);
     ctx.reply(`💰 Sizning balans: ${user.coin_balance} coin`);
   } catch (error) {
+    console.error('Balance error:', error);
     ctx.reply('❌ Xato!');
   }
 });
@@ -138,19 +144,19 @@ bot.hears('💰 Coin sotib olish', async (ctx) => {
   ctx.reply(
     `💰 Coin paketlari:\n\n${packs}\n\n` +
     `Paketni kiriting (masalan: 100)`,
-    Markup.keyboard([['⬅️ Orqaga']])
+    Markup.keyboard([['⬅️ Orqaga']]).resize()
   );
 
   ctx.session.waitingForCoins = true;
 });
 
-// Coin paketi
-bot.on('text', async (ctx) => {
+// Coin paketi tanlash
+bot.on('text', async (ctx, next) => {
   if (ctx.session.waitingForCoins) {
     const coins = parseInt(ctx.message.text);
 
     if (!COIN_PACKS[coins]) {
-      return ctx.reply('❌ Noto\'g\'ri paket!');
+      return ctx.reply('❌ Noto\'g\'ri paket! Iltimos, 100, 500 yoki 1000 kiriting.');
     }
 
     try {
@@ -162,12 +168,11 @@ bot.on('text', async (ctx) => {
 
       await ctx.reply(
         `✅ To'lov kodingiz tayyor!\n\n` +
-        `\`${code}\`\n\n` +
+        `Kod: ${code}\n\n` +
         `Summa: $${usd}\n` +
         `Coin: ${coins}\n` +
         `Muddati: 24 soat\n\n` +
-        `Admin bilan to'lov qiling va kodni yuboringiz.`,
-        { parse_mode: 'Markdown' }
+        `Admin bilan to'lov qiling va kodni yuboringiz.`
       );
 
       // Adminga xabar
@@ -177,14 +182,16 @@ bot.on('text', async (ctx) => {
         `👤 ${user.first_name}\n` +
         `💰 $${usd}\n` +
         `🪙 ${coins} coin\n` +
-        `📝 Kod: \`${code}\``,
-        { parse_mode: 'Markdown' }
+        `📝 Kod: ${code}`
       );
     } catch (error) {
       console.error('Payment error:', error);
       ctx.reply('❌ Xato!');
     }
+    return;
   }
+  
+  return next();
 });
 
 // Referat, Mustaqil ish, Slaydlar
@@ -202,32 +209,34 @@ bot.hears(['📝 Referat', '🎯 Mustaqil ish', '🖼️ Slaydlar'], async (ctx)
     if (user.coin_balance < 130) {
       return ctx.reply(
         '❌ Coin yetmadi! Minimal 130 coin kerak.\n\n' +
-        'Coin sotib olishingiz mumkin.\n\n' +
-        '/buycoins tugmasini bosing yoki 💰 Coin sotib olish ni tanlang.',
+        'Coin sotib olishingiz mumkin.',
         Markup.keyboard([
           ['💰 Coin sotib olish'],
           ['⬅️ Orqaga']
-        ])
+        ]).resize()
       );
     }
 
     ctx.session.contentType = type;
-    ctx.reply('📝 Mavzu nomini kiriting:');
     ctx.session.step = 'title';
+    ctx.reply('📝 Mavzu nomini kiriting:');
 
   } catch (error) {
+    console.error('Content start error:', error);
     ctx.reply('❌ Xato!');
   }
 });
 
 // Mazmun oqimi
-bot.on('text', async (ctx) => {
-  if (!ctx.session.contentType) return;
+bot.on('text', async (ctx, next) => {
+  if (!ctx.session.contentType || !ctx.session.step) {
+    return next();
+  }
 
   const steps = ['title', 'institute', 'subject', 'direction', 'pages', 'format'];
-  const currentStep = ctx.session.step || 'title';
+  const currentStep = ctx.session.step;
 
-  if (!steps.includes(currentStep)) return;
+  if (!steps.includes(currentStep)) return next();
 
   const text = ctx.message.text.trim();
 
@@ -259,16 +268,16 @@ bot.on('text', async (ctx) => {
           ['6-8 (130 coin)', '9-10 (150 coin)'],
           ['11-15 (200 coin)'],
           ['⬅️ Orqaga']
-        ])
+        ]).resize()
       );
       break;
 
     case 'pages':
-      const pageRange = text;
+      const pageRange = text.replace(/\s*\(.*\)/, '');
       const coins = COIN_PRICES[pageRange];
 
       if (!coins) {
-        return ctx.reply('❌ Noto\'g\'ri tanlash!');
+        return ctx.reply('❌ Noto\'g\'ri tanlash! Iltimos, tugmalardan foydalaning.');
       }
 
       ctx.session.pageRange = pageRange;
@@ -280,7 +289,7 @@ bot.on('text', async (ctx) => {
         Markup.keyboard([
           ['📄 PDF', '📋 DOCX'],
           ['⬅️ Orqaga']
-        ])
+        ]).resize()
       );
       break;
 
@@ -288,12 +297,12 @@ bot.on('text', async (ctx) => {
       const format = text.includes('PDF') ? 'pdf' : text.includes('DOCX') ? 'docx' : null;
 
       if (!format) {
-        return ctx.reply('❌ Noto\'g\'ri format!');
+        return ctx.reply('❌ Noto\'g\'ri format! Iltimos, tugmalardan foydalaning.');
       }
 
       try {
         const user = await getUser(ctx.from.id);
-        const pages = parseInt(ctx.session.pageRange);
+        const pages = parseInt(ctx.session.pageRange.split('-')[0]);
 
         await removeCoins(user.id, ctx.session.coins);
 
@@ -317,25 +326,27 @@ bot.on('text', async (ctx) => {
           `⏳ 2-5 minut kutib turing...`
         );
 
+        // Reset session
         ctx.session.contentType = null;
         ctx.session.step = null;
 
         // TODO: AI orqali mazmun yaratish
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        ctx.reply(
-          '✅ Hujjat tayyor!',
-          Markup.keyboard([
-            ['📝 Referat', '🎯 Mustaqil ish'],
-            ['🖼️ Slaydlar', '💰 Coin sotib olish'],
-            ['👥 Referral', '📊 Balans']
-          ]).resize()
-        );
+        setTimeout(async () => {
+          await ctx.reply(
+            '✅ Hujjat tayyor!\n\n(AI integratsiya qo\'shilmagan)',
+            Markup.keyboard([
+              ['📝 Referat', '🎯 Mustaqil ish'],
+              ['🖼️ Slaydlar', '💰 Coin sotib olish'],
+              ['👥 Referral', '📊 Balans']
+            ]).resize()
+          );
+        }, 2000);
 
       } catch (error) {
         console.error('Order error:', error);
-        ctx.reply('❌ Xato!');
+        ctx.reply('❌ Xato: ' + error.message);
       }
+      break;
   }
 });
 
@@ -376,7 +387,7 @@ bot.hears('🔐 To\'lov kodini kiritish', async (ctx) => {
   ctx.reply('📝 To\'lov kodini kiriting:');
 });
 
-bot.on('text', async (ctx) => {
+bot.on('text', async (ctx, next) => {
   if (ctx.session.verifyingCode && ctx.from.id === ADMIN_ID) {
     const code = ctx.message.text.trim().toUpperCase();
 
@@ -393,9 +404,13 @@ bot.on('text', async (ctx) => {
       );
 
     } catch (error) {
+      console.error('Verify payment error:', error);
       ctx.reply(`❌ ${error.message}`);
     }
+    return;
   }
+  
+  return next();
 });
 
 // Error handler
